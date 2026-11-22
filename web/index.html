@@ -113,6 +113,10 @@ tr.bad input[data-k=valeur]{border-color:#e5484d;color:#ff8a8a;background:#2a121
 .lr{width:100%;justify-content:flex-start;border:0;background:none;min-height:32px;padding:0 6px;font-weight:500;gap:10px;border-radius:4px;text-align:left}
 .lr:hover{background:var(--p3)}.lr .ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tag{flex:none;font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;min-width:52px;text-align:center}
+.dirs{padding:8px 14px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}.dirs[hidden]{display:none}
+.dirs h4{margin:4px 0;font:700 13px Barlow,sans-serif;color:var(--copper)}
+.dirrow{display:flex;gap:6px;align-items:center}.dirrow .ln{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.dirrow small{color:var(--mute)}
+.dirs .row{display:flex;gap:6px}.dirs .row input{flex:1}
 .t-pdf{background:#2b3a55;color:#b9cdf5}.t-board,.t-asc{background:#163a2a;color:#8fe0b5}.t-fz{background:#3a2a2a;color:#d9a3a3}
 .upd{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#3a2c18;color:var(--mark);font-size:14px;border-top:1px solid #6b4a1f}.upd[hidden]{display:none}.upd button{min-height:30px}
 body{grid-template-rows:auto minmax(0,1fr) auto auto}
@@ -217,10 +221,11 @@ body{grid-template-rows:auto minmax(0,1fr) auto auto}
   </div>
 </aside>
 <aside id="lib" aria-label="Bibliothèque">
-  <div class="dhead"><h2>Bibliothèque</h2><button id="libRefresh" title="Relire le dossier">Actualiser</button><button id="libFolder">Ouvrir le dossier</button><button id="libClose" aria-label="Fermer">✕</button></div>
+  <div class="dhead"><h2>Bibliothèque</h2><button id="libRefresh" title="Relire les dossiers">Actualiser</button><button id="libDirsBtn" aria-expanded="false">Dossiers…</button><button id="libClose" aria-label="Fermer">✕</button></div>
+  <div id="libDirs" class="dirs" hidden></div>
   <div class="lf"><input id="libQ" type="search" placeholder="Chercher un modèle (k53sd, 820-3536, x51l…)" autocomplete="off" aria-label="Chercher dans la bibliothèque"></div>
   <div id="libList" class="dbody"></div>
-  <p class="hint" style="padding:6px 14px 10px;margin:0;border-top:1px solid var(--line)">Dossier : <span id="libDir">…</span><br>Copiez-y vos schémas PDF, vos vues de carte ou directement vos fichiers .zip.</p>
+  <p class="hint" style="padding:6px 14px 10px;margin:0;border-top:1px solid var(--line)">Dossiers lus : <span id="libDir">…</span><br>Copiez-y vos schémas PDF, vos vues de carte ou directement vos fichiers .zip.</p>
 </aside>
 <div id="lightbox" role="dialog" aria-label="Image agrandie"><img alt=""></div>
 <script>
@@ -868,13 +873,13 @@ let libItems=[];
 const KIND={pdf:'Schéma',board:'Carte',asc:'Carte',fz:'.fz'};
 async function loadLib(){
   $('#libList').innerHTML='<p class="hint">Lecture de la bibliothèque…</p>';
-  try{const d=await (await fetch('/api/library',{cache:'no-store'})).json();libItems=d.items||[];$('#libDir').textContent=d.dir;renderLib()}
+  try{const d=await (await fetch('/api/library',{cache:'no-store'})).json();libItems=d.items||[];renderLib();if(!dirsLoaded)loadDirs()}
   catch(e){$('#libList').innerHTML='<p class="hint">Bibliothèque illisible.</p>'}
 }
 function renderLib(){
   const f=$('#libQ').value.trim().toLowerCase();
   const it=libItems.map((x,i)=>[x,i]).filter(([x])=>!f||(x.name+' '+x.group+' '+x.id).toLowerCase().includes(f));
-  if(!libItems.length){$('#libList').innerHTML='<p class="hint" style="margin-top:14px">La bibliothèque est vide. Cliquez sur « Ouvrir le dossier » et copiez-y vos schémas PDF, vues de carte ou fichiers .zip, puis « Actualiser ».</p>';return}
+  if(!libItems.length){$('#libList').innerHTML='<p class="hint" style="margin-top:14px">La bibliothèque est vide. Ouvrez « Dossiers… », ouvrez un dossier et copiez-y vos schémas PDF, vues de carte ou fichiers .zip, puis cliquez sur « Actualiser ».</p>';showDirs(true);return}
   let h='',g=null,n=0;const cnt={};it.forEach(([x])=>cnt[x.group]=(cnt[x.group]||0)+1);
   for(const [x,i] of it){if(++n>1500)break;if(x.group!==g){g=x.group;h+=`<h4>${esc(g)}<small>${cnt[g]}</small></h4>`}
     h+=`<button class="lr" data-li="${i}" title="${esc(x.id)}"><span class="tag t-${x.kind}">${KIND[x.kind]}</span><span class="ln">${esc(x.name)}</span></button>`}
@@ -886,7 +891,7 @@ function toks(str){const s=String(str).toLowerCase(),t=new Set();
   s.split(/[^a-z0-9]+/).forEach(x=>{if(x.length>=3&&/\d/.test(x)&&/[a-z]/.test(x)&&!/^r\d/.test(x))t.add(x)});return t}
 function suggestPdf(x){
   const bt=toks(x.id+' '+x.name);if(!bt.size)return;
-  const sc=libItems.map((p,i)=>{if(p.kind!=='pdf')return null;let k=0;toks(p.id).forEach(t=>{if(bt.has(t))k++});return k?[k+(p.group===x.group?.1:0),i]:null}).filter(Boolean).sort((a,b)=>b[0]-a[0]);
+  const sc=libItems.map((p,i)=>{if(p.kind!=='pdf')return null;let k=0;toks(p.id).forEach(t=>{if(bt.has(t))k++});const rv=(String(x.id).match(/_r\d+(\.\d+)*/i)||[''])[0].toLowerCase();return k?[k+(p.group===x.group?.1:0)+(rv&&p.id.toLowerCase().includes(rv)?.05:0),i]:null}).filter(Boolean).sort((a,b)=>b[0]-a[0]);
   if(!sc.length)return;const best=sc[0][0];
   $('#hits').innerHTML='<span class="num" style="align-self:center">Schéma probable :</span>'+sc.filter(s=>s[0]>=best-.5).slice(0,4).map(([,i])=>`<button class="chip" data-lib="${i}">${esc(libItems[i].name)}</button>`).join('');
 }
@@ -902,7 +907,31 @@ async function openLibItem(x){
 }
 $('#openLib').onclick=()=>libOpen(!$('#lib').classList.contains('open'));
 $('#libClose').onclick=()=>libOpen(false);$('#libRefresh').onclick=loadLib;
-$('#libFolder').onclick=()=>fetch('/api/libopen',{method:'POST',headers:{'X-Atelier':'1'}});
+let dirsLoaded=false;
+const H={'X-Atelier':'1','Content-Type':'application/json'};
+function showDirs(o){$('#libDirs').hidden=!o;$('#libDirsBtn').setAttribute('aria-expanded',o);if(o)loadDirs()}
+async function loadDirs(post){
+  const box=$('#libDirs');
+  try{const r=await fetch('/api/libdirs',post?{method:'POST',headers:H,body:JSON.stringify(post)}:{cache:'no-store'});
+    if(!r.ok)throw new Error(await r.text());const d=await r.json();dirsLoaded=true;
+    $('#libDir').textContent=d.dirs.map(x=>x.path).join('  ·  ');
+    const used=new Set(d.dirs.map(x=>x.path.toLowerCase()));
+    box.innerHTML='<h4>Dossiers lus par la bibliothèque</h4>'+d.dirs.map((x,i)=>`<div class="dirrow"><span class="ln" title="${esc(x.path)}">${esc(x.path)}${x.default?' <small>(par défaut)</small>':''}${x.exists?'':' <small class="anom">introuvable</small>'}</span><button data-open="${i}">Ouvrir</button>${x.default?'':`<button data-rm="${esc(x.path)}">Retirer</button>`}</div>`).join('')
+      +d.suggestions.filter(s=>!used.has(s.path.toLowerCase())).map(s=>`<button class="main" data-add="${esc(s.path)}">+ Utiliser ${esc(s.label)} (${esc(s.path)})</button>`).join('')
+      +(d.canPick?'<button data-pick="1">Choisir un autre dossier…</button>':'')
+      +'<form class="row" id="dirForm"><input id="dirIn" placeholder="ou collez un chemin, ex. D:\\Schémas" aria-label="Chemin d\'un dossier"><button>Ajouter</button></form>'
+      +'<p class="hint">Avec OneDrive ou Google Drive, mettez vos zips une seule fois dans ce dossier : tous vos PC équipés de BoardSim les verront.</p>';
+    $('#dirForm').onsubmit=e=>{e.preventDefault();const v=$('#dirIn').value.trim();if(v)changeDir('add',v)};
+  }catch(e){box.insertAdjacentHTML('afterbegin',`<p class="hint anom">${esc(e.message||e)}</p>`)}
+}
+async function changeDir(action,path){await loadDirs({action,path});loadLib()}
+$('#libDirsBtn').onclick=()=>showDirs($('#libDirs').hidden);
+$('#libDirs').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.open!==undefined)fetch('/api/libopen?i='+b.dataset.open,{method:'POST',headers:H});
+  if(b.dataset.rm)changeDir('remove',b.dataset.rm);
+  if(b.dataset.add)changeDir('add',b.dataset.add);
+  if(b.dataset.pick){b.textContent='Choisissez le dossier dans la fenêtre Windows…';try{const r=await fetch('/api/libpick',{method:'POST',headers:H});const d=await r.json();if(d.path)changeDir('add',d.path);else loadDirs()}catch(err){loadDirs()}}
+});
 $('#libQ').addEventListener('input',renderLib);
 $('#libList').addEventListener('click',e=>{const b=e.target.closest('[data-li]');if(b)openLibItem(libItems[+b.dataset.li])});
 $('#hits').addEventListener('click',e=>{const b=e.target.closest('[data-lib]');if(b)openLibItem(libItems[+b.dataset.lib])});

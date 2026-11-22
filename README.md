@@ -16,6 +16,8 @@ Le carnet de réparation est enregistré dans `%APPDATA%\BoardSim\carnet.json`, 
 
 Le bouton **Bibliothèque** (touche B) liste les schémas et vues de carte rangés dans `Documents\BoardSim\Bibliothèque`, **y compris à l'intérieur des fichiers .zip** (inutile de les décompresser). Classement par marque, recherche par modèle, ouverture en un clic. Quand une vue de carte est ouverte, BoardSim propose le schéma PDF dont le nom correspond.
 
+Le bouton **Dossiers…** permet d'ajouter d'autres dossiers, par exemple un dossier **OneDrive**, **Google Drive** ou **Dropbox** (détectés automatiquement) : mettez-y vos zips une seule fois et tous vos PC équipés de BoardSim les verront. La liste des dossiers est enregistrée dans `%APPDATA%\BoardSim\config.json`.
+
 Ces fichiers restent sur votre ordinateur : ils ne font pas partie du logiciel et ne sont jamais envoyés sur GitHub.
 
 ## Mises à jour automatiques

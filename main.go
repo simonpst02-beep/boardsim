@@ -116,6 +116,8 @@ func main() {
 	mux.HandleFunc("/api/library", handleLibrary)
 	mux.HandleFunc("/api/libfile", handleLibFile)
 	mux.HandleFunc("/api/libopen", handleLibOpen)
+	mux.HandleFunc("/api/libdirs", handleLibDirs)
+	mux.HandleFunc("/api/libpick", handleLibPick)
 
 	srv := &http.Server{Handler: guard(mux), ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = srv.Serve(ln) }()
