@@ -12,9 +12,14 @@ Au premier lancement, Windows peut afficher « Windows a protégé votre ordinat
 
 Le carnet de réparation est enregistré dans `%APPDATA%\BoardSim\carnet.json`, avec une copie de secours `carnet.json.bak`.
 
-## Mises à jour
+## Mises à jour automatiques
 
-Au démarrage, le logiciel regarde la dernière version publiée dans les Releases du dépôt GitHub. Si elle est plus récente, un bandeau propose **Mettre à jour** : le logiciel télécharge le nouvel `BoardSim.exe`, vérifie son empreinte SHA-256, remplace l'ancien et redémarre.
+BoardSim se met à jour tout seul à partir des Releases de ce dépôt :
+
+- **au démarrage**, s'il existe une version plus récente, il la télécharge, vérifie son empreinte SHA-256, remplace l'ancien `BoardSim.exe` et redémarre, en quelques secondes ;
+- **pendant l'utilisation**, il vérifie toutes les 3 heures. Si une version est sortie, il l'installe dès que vous n'avez pas touché au logiciel pendant 10 minutes, pour ne jamais vous couper en plein travail. Un bouton « Installer maintenant » permet de ne pas attendre.
+
+Le carnet est enregistré sur le disque, et la carte et le schéma ouverts sont rouverts après le redémarrage. Si la mise à jour échoue (par exemple si le logiciel est dans Program Files), l'ancienne version est conservée et un message l'explique.
 
 ## Publier une nouvelle version
 

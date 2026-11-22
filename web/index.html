@@ -850,22 +850,31 @@ if(innerWidth<=900)setMode('board');
 renderList();
 /* ---------- Version bureau : présence et mises à jour ---------- */
 setInterval(()=>fetch('/api/ping',{cache:'no-store'}).catch(()=>{}),5000);fetch('/api/ping').catch(()=>{});
-async function checkUpdate(){
+let lastAct=Date.now(),updBusy=false,updFailed=false;
+['pointerdown','keydown','wheel'].forEach(t=>addEventListener(t,()=>lastAct=Date.now(),{passive:true}));
+async function installUpdate(v){
+  if(updBusy||updFailed)return;updBusy=true;const u=$('#upd');u.hidden=false;
+  u.innerHTML=`<span>Mise à jour automatique vers <b>${esc(v.latest)}</b>… (vos données sont enregistrées)</span>`;
+  try{const r=await fetch('/api/update',{method:'POST',headers:{'X-Atelier':'1'}});const t=await r.text();if(!r.ok)throw new Error(t);
+    u.innerHTML=`<span>BoardSim ${esc(v.latest)} installé, redémarrage…</span>`;
+    await new Promise(r=>setTimeout(r,2500));
+    for(let i=0;i<40;i++){try{const p=await fetch('/api/version',{cache:'no-store'});if(p.ok&&(await p.json()).version!==v.version){location.reload();return}}catch(e){}await new Promise(r=>setTimeout(r,500))}
+    location.reload();
+  }catch(e){updFailed=true;updBusy=false;u.innerHTML=`<span>La mise à jour automatique a échoué : ${esc(e.message||e)}</span><button id="noUpd">Fermer</button>`;$('#noUpd').onclick=()=>u.hidden=true}
+}
+async function checkUpdate(when){
   try{const v=await (await fetch('/api/version',{cache:'no-store'})).json();
     document.title='BoardSim '+v.version;
+    if(!v.update)return;
+    if(when==='start'||Date.now()-lastAct>10*60e3){installUpdate(v);return}
     const u=$('#upd');
-    if(v.update){u.innerHTML=`<span>Nouvelle version <b>${esc(v.latest)}</b> disponible (vous avez ${esc(v.version)}).</span><button class="main" id="doUpd">Mettre à jour</button><button id="noUpd">Plus tard</button>`;u.hidden=false;
-      $('#noUpd').onclick=()=>u.hidden=true;
-      $('#doUpd').onclick=async()=>{u.innerHTML='<span>Téléchargement de la mise à jour…</span>';
-        try{const r=await fetch('/api/update',{method:'POST',headers:{'X-Atelier':'1'}});const t=await r.text();if(!r.ok)throw new Error(t);
-          u.innerHTML='<span>Mise à jour installée, redémarrage…</span>';
-          await new Promise(r=>setTimeout(r,2500));
-          for(let i=0;i<40;i++){try{const p=await fetch('/api/version',{cache:'no-store'});if(p.ok&&(await p.json()).version!==v.version){location.reload();return}}catch(e){}await new Promise(r=>setTimeout(r,500))}
-          location.reload();
-        }catch(e){u.innerHTML=`<span>La mise à jour a échoué : ${esc(e.message||e)}</span>`}}}
+    u.innerHTML=`<span>BoardSim <b>${esc(v.latest)}</b> est disponible. Elle s'installera toute seule dès que vous ferez une pause de 10 minutes.</span><button class="main" id="doUpd">Installer maintenant</button>`;u.hidden=false;
+    $('#doUpd').onclick=()=>installUpdate(v);
+    const t=setInterval(()=>{if(Date.now()-lastAct>10*60e3){clearInterval(t);installUpdate(v)}},30000);
   }catch(e){}
 }
-checkUpdate();
+checkUpdate('start');
+setInterval(()=>{if(!updBusy)checkUpdate('periodic')},3*3600e3);
 
 fit();select({part:brd.parts.findIndex(p=>p.name==='U1')});
 initStore();restore();
