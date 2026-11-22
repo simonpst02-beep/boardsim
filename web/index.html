@@ -106,6 +106,14 @@ tr.bad input[data-k=valeur]{border-color:#e5484d;color:#ff8a8a;background:#2a121
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #lightbox{position:fixed;inset:0;background:#000e;display:none;place-items:center;z-index:60;padding:20px}#lightbox img{max-width:100%;max-height:100%}
 #listBtn{display:none}
+#lib{position:fixed;top:0;left:0;bottom:0;width:min(560px,100%);background:var(--p1);border-right:1px solid var(--line);box-shadow:20px 0 40px #0008;transform:translateX(-105%);transition:transform .22s ease;z-index:45;display:flex;flex-direction:column}
+#lib.open{transform:none}#libList{flex:1;padding-top:0}
+#libList h4{margin:14px 0 4px;font:700 13px Barlow,sans-serif;color:var(--copper);text-transform:capitalize;position:sticky;top:0;background:var(--p1);padding:4px 0}
+#libList h4 small{color:var(--mute);font-weight:500;margin-left:6px}
+.lr{width:100%;justify-content:flex-start;border:0;background:none;min-height:32px;padding:0 6px;font-weight:500;gap:10px;border-radius:4px;text-align:left}
+.lr:hover{background:var(--p3)}.lr .ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{flex:none;font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;min-width:52px;text-align:center}
+.t-pdf{background:#2b3a55;color:#b9cdf5}.t-board,.t-asc{background:#163a2a;color:#8fe0b5}.t-fz{background:#3a2a2a;color:#d9a3a3}
 .upd{display:flex;gap:10px;align-items:center;padding:6px 10px;background:#3a2c18;color:var(--mark);font-size:14px;border-top:1px solid #6b4a1f}.upd[hidden]{display:none}.upd button{min-height:30px}
 body{grid-template-rows:auto minmax(0,1fr) auto auto}
 @media(max-width:900px){
@@ -135,6 +143,7 @@ body{grid-template-rows:auto minmax(0,1fr) auto auto}
     <button data-mode="split" aria-pressed="true">Côte à côte</button>
     <button data-mode="pdf" aria-pressed="false">Schéma</button>
   </div>
+  <button id="openLib" title="Bibliothèque (B)">Bibliothèque</button>
   <button id="openBook">Carnet <span class="badge" id="mcount"></span></button>
 </div>
 <div class="app">
@@ -207,6 +216,12 @@ body{grid-template-rows:auto minmax(0,1fr) auto auto}
     <p class="hint" id="imgEmpty">Ajoutez vos captures de la Qianli IR (dossier Picture).</p>
   </div>
 </aside>
+<aside id="lib" aria-label="Bibliothèque">
+  <div class="dhead"><h2>Bibliothèque</h2><button id="libRefresh" title="Relire le dossier">Actualiser</button><button id="libFolder">Ouvrir le dossier</button><button id="libClose" aria-label="Fermer">✕</button></div>
+  <div class="lf"><input id="libQ" type="search" placeholder="Chercher un modèle (k53sd, 820-3536, x51l…)" autocomplete="off" aria-label="Chercher dans la bibliothèque"></div>
+  <div id="libList" class="dbody"></div>
+  <p class="hint" style="padding:6px 14px 10px;margin:0;border-top:1px solid var(--line)">Dossier : <span id="libDir">…</span><br>Copiez-y vos schémas PDF, vos vues de carte ou directement vos fichiers .zip.</p>
+</aside>
 <div id="lightbox" role="dialog" aria-label="Image agrandie"><img alt=""></div>
 <script>
 {
@@ -252,7 +267,7 @@ function parseAsc(text){
     if(st==='format'){if(t.length>=2&&isNum(t[0])&&isNum(t[1]))outline.push([t[0]*1000,t[1]*1000])}
     else if(st==='pins'){
       if(/^Part/i.test(l)){const r=l.replace(/^Part\s*/i,'').split(/\s+/);parts.push({name:r[0],side:r[1]==='(T)'?'T':'B'})}
-      else if(parts.length&&t.length>=6&&isNum(t[0])&&isNum(t[2])&&isNum(t[3]))pins.push({x:t[2]*1000,y:t[3]*1000,net:t[5]||'',probe:t[6],part:parts.length-1})}
+      else if(parts.length&&t.length>=6&&isNum(t[0])&&isNum(t[2])&&isNum(t[3]))pins.push({x:t[2]*1000,y:t[3]*1000,net:/^\(NC\)$/i.test(t[5]||'')?'':(t[5]||''),probe:t[6],part:parts.length-1})}
     else if(st==='nails'){const r=l.slice(1).trim().split(/\s+/);if(r.length>=8&&isNum(r[0])&&isNum(r[1]))nails[r[0]]=r[7]}
   }
   pins.forEach(p=>{if((!p.net||p.net==='-')&&nails[p.probe])p.net=nails[p.probe]});
@@ -848,6 +863,51 @@ $('#openBook').onclick=()=>book(true);$('#closeBook').onclick=()=>book(false);
 $('#listBtn').onclick=()=>document.body.classList.toggle('listopen');
 if(innerWidth<=900)setMode('board');
 renderList();
+/* ---------- Bibliothèque locale ---------- */
+let libItems=[];
+const KIND={pdf:'Schéma',board:'Carte',asc:'Carte',fz:'.fz'};
+async function loadLib(){
+  $('#libList').innerHTML='<p class="hint">Lecture de la bibliothèque…</p>';
+  try{const d=await (await fetch('/api/library',{cache:'no-store'})).json();libItems=d.items||[];$('#libDir').textContent=d.dir;renderLib()}
+  catch(e){$('#libList').innerHTML='<p class="hint">Bibliothèque illisible.</p>'}
+}
+function renderLib(){
+  const f=$('#libQ').value.trim().toLowerCase();
+  const it=libItems.map((x,i)=>[x,i]).filter(([x])=>!f||(x.name+' '+x.group+' '+x.id).toLowerCase().includes(f));
+  if(!libItems.length){$('#libList').innerHTML='<p class="hint" style="margin-top:14px">La bibliothèque est vide. Cliquez sur « Ouvrir le dossier » et copiez-y vos schémas PDF, vues de carte ou fichiers .zip, puis « Actualiser ».</p>';return}
+  let h='',g=null,n=0;const cnt={};it.forEach(([x])=>cnt[x.group]=(cnt[x.group]||0)+1);
+  for(const [x,i] of it){if(++n>1500)break;if(x.group!==g){g=x.group;h+=`<h4>${esc(g)}<small>${cnt[g]}</small></h4>`}
+    h+=`<button class="lr" data-li="${i}" title="${esc(x.id)}"><span class="tag t-${x.kind}">${KIND[x.kind]}</span><span class="ln">${esc(x.name)}</span></button>`}
+  $('#libList').innerHTML=h||'<p class="hint">Rien ne correspond.</p>';
+}
+function libOpen(o){$('#lib').classList.toggle('open',o);if(o){if(!libItems.length)loadLib();setTimeout(()=>$('#libQ').focus(),60)}}
+function toks(str){const s=String(str).toLowerCase(),t=new Set();
+  (s.match(/\d{3}-\d{4,5}/g)||[]).forEach(x=>t.add(x));
+  s.split(/[^a-z0-9]+/).forEach(x=>{if(x.length>=3&&/\d/.test(x)&&/[a-z]/.test(x)&&!/^r\d/.test(x))t.add(x)});return t}
+function suggestPdf(x){
+  const bt=toks(x.id+' '+x.name);if(!bt.size)return;
+  const sc=libItems.map((p,i)=>{if(p.kind!=='pdf')return null;let k=0;toks(p.id).forEach(t=>{if(bt.has(t))k++});return k?[k+(p.group===x.group?.1:0),i]:null}).filter(Boolean).sort((a,b)=>b[0]-a[0]);
+  if(!sc.length)return;const best=sc[0][0];
+  $('#hits').innerHTML='<span class="num" style="align-self:center">Schéma probable :</span>'+sc.filter(s=>s[0]>=best-.5).slice(0,4).map(([,i])=>`<button class="chip" data-lib="${i}">${esc(libItems[i].name)}</button>`).join('');
+}
+async function openLibItem(x){
+  if(x.kind==='fz'){$('#fmt').textContent=`${x.name} : fichier .fz chiffré (clé Asus requise), BoardSim ne peut pas l'ouvrir.`;return}
+  $('#fmt').textContent='Ouverture de '+x.name+'…';
+  try{const r=await fetch('/api/libfile?id='+encodeURIComponent(x.id)+(x.kind==='asc'?'&asc=1':''));if(!r.ok)throw new Error(await r.text());
+    const blob=await r.blob();
+    if(x.kind==='pdf'){if(document.body.dataset.mode==='board')setMode('split');await openPdf(new File([blob],x.name+'.pdf'));$('#fmt').textContent='Schéma ouvert : '+x.name}
+    else{await openBoard(new File([blob],x.kind==='asc'?x.name+'.asc.txt':x.id.split(/[\/!]/).pop()));if(!pdf)suggestPdf(x)}
+    libOpen(false);
+  }catch(e){$('#fmt').textContent='Impossible d’ouvrir '+x.name+' : '+(e.message||e)}
+}
+$('#openLib').onclick=()=>libOpen(!$('#lib').classList.contains('open'));
+$('#libClose').onclick=()=>libOpen(false);$('#libRefresh').onclick=loadLib;
+$('#libFolder').onclick=()=>fetch('/api/libopen',{method:'POST',headers:{'X-Atelier':'1'}});
+$('#libQ').addEventListener('input',renderLib);
+$('#libList').addEventListener('click',e=>{const b=e.target.closest('[data-li]');if(b)openLibItem(libItems[+b.dataset.li])});
+$('#hits').addEventListener('click',e=>{const b=e.target.closest('[data-lib]');if(b)openLibItem(libItems[+b.dataset.lib])});
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select'))return;if(e.key==='b'||e.key==='B')libOpen(!$('#lib').classList.contains('open'));if(e.key==='Escape')libOpen(false)});
+
 /* ---------- Version bureau : présence et mises à jour ---------- */
 setInterval(()=>fetch('/api/ping',{cache:'no-store'}).catch(()=>{}),5000);fetch('/api/ping').catch(()=>{});
 let lastAct=Date.now(),updBusy=false,updFailed=false;

@@ -113,6 +113,9 @@ func main() {
 	mux.HandleFunc("/api/store", handleStore)
 	mux.HandleFunc("/api/version", handleVersion)
 	mux.HandleFunc("/api/update", handleUpdate)
+	mux.HandleFunc("/api/library", handleLibrary)
+	mux.HandleFunc("/api/libfile", handleLibFile)
+	mux.HandleFunc("/api/libopen", handleLibOpen)
 
 	srv := &http.Server{Handler: guard(mux), ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = srv.Serve(ln) }()

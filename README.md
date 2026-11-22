@@ -12,6 +12,12 @@ Au premier lancement, Windows peut afficher « Windows a protégé votre ordinat
 
 Le carnet de réparation est enregistré dans `%APPDATA%\BoardSim\carnet.json`, avec une copie de secours `carnet.json.bak`.
 
+## Bibliothèque
+
+Le bouton **Bibliothèque** (touche B) liste les schémas et vues de carte rangés dans `Documents\BoardSim\Bibliothèque`, **y compris à l'intérieur des fichiers .zip** (inutile de les décompresser). Classement par marque, recherche par modèle, ouverture en un clic. Quand une vue de carte est ouverte, BoardSim propose le schéma PDF dont le nom correspond.
+
+Ces fichiers restent sur votre ordinateur : ils ne font pas partie du logiciel et ne sont jamais envoyés sur GitHub.
+
 ## Mises à jour automatiques
 
 BoardSim se met à jour tout seul à partir des Releases de ce dépôt :
