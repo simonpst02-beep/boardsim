@@ -1,10 +1,13 @@
-# Publie BoardSim.exe dans les « Releases » à chaque étiquette v1.2.3.
+# Publie BoardSim.exe dans les « Releases » quand le fichier VERSION change.
+# Pour sortir une nouvelle version : modifiez VERSION (ex. v1.1.0) et envoyez.
 # Les logiciels déjà installés la trouvent et proposent la mise à jour.
 name: Publier une version
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['VERSION']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,15 +20,28 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+      - name: Lire la version
+        id: v
+        run: |
+          V=$(tr -d ' \r\n' < VERSION)
+          case "$V" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "VERSION doit ressembler à v1.2.3 (reçu : $V)"; exit 1;; esac
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - name: Vérifier que cette version n'existe pas déjà
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
+            echo "La version ${{ steps.v.outputs.version }} existe déjà : augmentez le numéro dans VERSION."; exit 1
+          fi
       - name: Compiler BoardSim.exe
         run: |
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
-            -ldflags "-H windowsgui -s -w -X main.version=${GITHUB_REF_NAME} -X main.repo=${GITHUB_REPOSITORY}" \
+            -ldflags "-H windowsgui -s -w -X main.version=${{ steps.v.outputs.version }} -X main.repo=${GITHUB_REPOSITORY}" \
             -o BoardSim.exe .
           sha256sum BoardSim.exe | cut -d' ' -f1 > BoardSim.exe.sha256
       - name: Publier la version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" BoardSim.exe BoardSim.exe.sha256 \
-            --title "BoardSim ${GITHUB_REF_NAME}" --generate-notes
+          gh release create "${{ steps.v.outputs.version }}" BoardSim.exe BoardSim.exe.sha256 \
+            --target "${GITHUB_SHA}" --title "BoardSim ${{ steps.v.outputs.version }}" --generate-notes

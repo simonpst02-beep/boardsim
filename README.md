@@ -18,16 +18,13 @@ Au démarrage, le logiciel regarde la dernière version publiée dans les Releas
 
 ## Publier une nouvelle version
 
-Tout est automatique avec GitHub Actions (fichier `.github/workflows/release.yml`) :
+Tout est automatique avec GitHub Actions (fichier `.github/workflows/release.yml`).
 
-```
-git add .
-git commit -m "Ce qui change"
-git tag v1.1.0
-git push && git push --tags
-```
+1. Faites vos modifications.
+2. Changez le numéro dans le fichier `VERSION` (par exemple `v1.1.0`). On peut le faire directement sur le site GitHub avec le crayon ✏️.
+3. Envoyez (commit).
 
-Quelques minutes plus tard, `BoardSim.exe` et `BoardSim.exe.sha256` apparaissent dans les Releases, et tous les logiciels installés proposent la mise à jour. Les numéros doivent toujours augmenter : v1.1.0, v1.2.0, v2.0.0…
+Quelques minutes plus tard, `BoardSim.exe` et `BoardSim.exe.sha256` apparaissent dans les Releases, et tous les BoardSim installés proposent la mise à jour. Le numéro doit toujours augmenter : v1.1.0, v1.2.0, v2.0.0…
 
 ## Compiler soi-même
 
